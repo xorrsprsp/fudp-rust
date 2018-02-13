@@ -1,0 +1,9 @@
+[package]
+name = "fudp"
+version = "0.1.0"
+authors = ["xorrsprsp"]
+
+[dependencies]
+clap = "*"
+ipaddress = "*"
+pnet = "*"
