@@ -164,7 +164,10 @@ fn main() {
         cloned_packet.clone_from(&ipv4_packet);
 
         if random_src {
-            let random_ipv4_addr = Ipv4Addr::new(rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>());
+            let random_ipv4_addr = Ipv4Addr::new(rng.gen::<u8>(),
+                                                 rng.gen::<u8>(),
+                                                 rng.gen::<u8>(),
+                                                 rng.gen::<u8>());
             cloned_packet.set_source(random_ipv4_addr);
         }
 
