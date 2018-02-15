@@ -87,6 +87,7 @@ fn main() {
     };
 
     let random_src = matches.is_present("random-src");
+    let single_packet = matches.is_present("single-packet");
 
     let dst_ip = match Ipv4Addr::from_str(dst_ip) {
         Ok(ip) => ip,
@@ -161,9 +162,17 @@ fn main() {
     loop {
         let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
         cloned_packet.clone_from(&ipv4_packet);
-        let written = match tx.send_to(cloned_packet, IpAddr::V4(dst_ip)) {
-            Ok(written) => written,
-            Err(e) => panic!("{}", e),
-        };
+
+        if random_src {
+            let random_ipv4_addr = Ipv4Addr::new(rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>());
+            cloned_packet.set_source(random_ipv4_addr);
+        }
+
+
+        tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+
+        if single_packet {
+            break;
+        }
     }
 }
