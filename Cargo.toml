@@ -7,3 +7,4 @@ authors = ["xorrsprsp"]
 clap = "*"
 ipaddress = "*"
 pnet = "*"
+rand = "*"
