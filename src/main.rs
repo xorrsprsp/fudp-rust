@@ -13,6 +13,7 @@ use pnet::packet;
 use pnet::packet::Packet;
 use pnet::packet::PacketSize;
 use pnet::packet::MutablePacket;
+use std::{thread, time};
 
 fn main() {
     let matches = App::new("fudp")
@@ -57,6 +58,12 @@ fn main() {
             Arg::with_name("src-ip")
                 .short("s")
                 .help("Spoofs a specified source IP")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("delay")
+                .short("d")
+                .help("Sleeps the thread for the specified time in ms before sending a new packet (Default: 0ms)")
                 .takes_value(true),
         )
         .arg(Arg::with_name("land-attack").short("l").help("Land Attack"))
@@ -107,6 +114,20 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    let delay_enabled = matches.is_present("delay");
+    let delay = match matches.value_of("delay") {
+        Some(delay) => match delay.parse::<u64>() {
+            Ok(delay) => delay,
+            Err(err) => {
+                println!("Error while setting delay: {}", err);
+                std::process::exit(1);
+            }
+        },
+        None => 0,
+    };
+
+    let delay_ms = time::Duration::from_millis(delay);
 
     if !src_ip.is_unspecified() && random_src == true {
         eprintln!("ERROR: -s and -r flags are mutually exclusive");
@@ -188,6 +209,10 @@ fn main() {
 
         if single_packet {
             break;
+        }
+
+        if delay_enabled {
+            thread::sleep(delay_ms);
         }
     }
 }
