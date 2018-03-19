@@ -2,6 +2,7 @@
 extern crate clap;
 extern crate pnet;
 extern crate rand;
+extern crate spin_sleep;
 
 use rand::Rng;
 use std::str::FromStr;
@@ -11,9 +12,8 @@ use pnet::transport;
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet;
 use pnet::packet::Packet;
-use pnet::packet::PacketSize;
 use pnet::packet::MutablePacket;
-use std::{thread, time};
+use std::time;
 
 fn main() {
     let matches = App::new("fudp")
@@ -191,6 +191,9 @@ fn main() {
     ipv4_packet.populate(&ipv4_struct);
     println!("{:?}", ipv4_packet);
     ipv4_packet.set_payload(udp_packet.packet());
+
+    let spin_sleeper = spin_sleep::SpinSleeper::new(100_000_000);
+
     loop {
         let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
         cloned_packet.clone_from(&ipv4_packet);
@@ -212,7 +215,7 @@ fn main() {
         }
 
         if delay_enabled {
-            thread::sleep(delay_ms);
+            spin_sleeper.sleep(delay_ms);
         }
     }
 }
