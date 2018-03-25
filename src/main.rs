@@ -13,7 +13,6 @@ use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet;
 use pnet::packet::Packet;
 use pnet::packet::MutablePacket;
-use std::time;
 
 fn main() {
     let matches = App::new("fudp")
@@ -227,7 +226,7 @@ fn main() {
             let _result = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
 
             if delay_enabled {
-                spin_sleeper.sleep_ns(delay * 1000);
+                spin_sleeper.sleep_ns(delay_micro);
             }
         }
     } else {
