@@ -194,36 +194,10 @@ fn main() {
     let spin_sleeper = spin_sleep::SpinSleeper::new(100_000_000);
 
     if single_packet {
-        let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
-        cloned_packet.clone_from(&ipv4_packet);
-
-        if random_src {
-            let random_ipv4_addr = Ipv4Addr::new(
-                rng.gen::<u8>(),
-                rng.gen::<u8>(),
-                rng.gen::<u8>(),
-                rng.gen::<u8>(),
-            );
-            cloned_packet.set_source(random_ipv4_addr);
-        }
-
-        let _result = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+        send_packets(buffer_clone, random_src);
     } else if delay_enabled {
         loop {
-            let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
-            cloned_packet.clone_from(&ipv4_packet);
-
-            if random_src {
-                let random_ipv4_addr = Ipv4Addr::new(
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                );
-                cloned_packet.set_source(random_ipv4_addr);
-            }
-
-            let _result = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+            send_packets(buffer_clone, random_src);
 
             if delay_enabled {
                 spin_sleeper.sleep_ns(delay_micro);
@@ -231,20 +205,24 @@ fn main() {
         }
     } else {
         loop {
-            let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
-            cloned_packet.clone_from(&ipv4_packet);
-
-            if random_src {
-                let random_ipv4_addr = Ipv4Addr::new(
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                    rng.gen::<u8>(),
-                );
-                cloned_packet.set_source(random_ipv4_addr);
-            }
-
-            let _result = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+            send_packets(buffer_clone, random_src);
         }
     }
+}
+
+fn send_packets(&mut buffer_clone: Vec<u8>, random_src: bool) {
+    let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
+    cloned_packet.clone_from(&ipv4_packet);
+
+    if random_src {
+        let random_ipv4_addr = Ipv4Addr::new(
+            rng.gen::<u8>(),
+            rng.gen::<u8>(),
+            rng.gen::<u8>(),
+            rng.gen::<u8>(),
+        );
+        cloned_packet.set_source(random_ipv4_addr);
+    }
+
+    let _result = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
 }
