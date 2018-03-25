@@ -194,10 +194,10 @@ fn main() {
     let spin_sleeper = spin_sleep::SpinSleeper::new(100_000_000);
 
     if single_packet {
-        send_packets(buffer_clone, random_src);
+        send_packets(tx, dst_ip, buffer_clone, random_src);
     } else if delay_enabled {
         loop {
-            send_packets(buffer_clone, random_src);
+            send_packets(tx, dst_ip, buffer_clone, random_src);
 
             if delay_enabled {
                 spin_sleeper.sleep_ns(delay_micro);
@@ -205,12 +205,12 @@ fn main() {
         }
     } else {
         loop {
-            send_packets(buffer_clone, random_src);
+            send_packets(tx, dst_ip, buffer_clone, random_src);
         }
     }
 }
 
-fn send_packets(&mut buffer_clone: Vec<u8>, random_src: bool) {
+fn send_packets(mut tx: TransportSender, dst_ip: Ipv4Addr, &mut buffer_clone: Vec<u8>, random_src: bool) {
     let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
     cloned_packet.clone_from(&ipv4_packet);
 
