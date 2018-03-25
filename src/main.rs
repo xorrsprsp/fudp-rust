@@ -208,7 +208,7 @@ fn main() {
             cloned_packet.set_source(random_ipv4_addr);
         }
 
-        result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+        let result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
     } else if delay_enabled {
         loop {
             let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
@@ -224,7 +224,7 @@ fn main() {
                 cloned_packet.set_source(random_ipv4_addr);
             }
 
-            result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+            let result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
 
             if delay_enabled {
                 spin_sleeper.sleep_ns(delay * 1000);
@@ -245,7 +245,7 @@ fn main() {
                 cloned_packet.set_source(random_ipv4_addr);
             }
 
-            result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
+            let result_ = tx.send_to(cloned_packet, IpAddr::V4(dst_ip));
         }
     }
 }
