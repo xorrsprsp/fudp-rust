@@ -2,9 +2,10 @@
 name = "fudp"
 version = "0.1.0"
 authors = ["xorrsprsp"]
+edition = "2024"  # Added this line for the newest edition
 
 [dependencies]
-clap = "*"
+clap = "4.4"  # Updated to a specific version for clap v4
 pnet = "*"
 rand = "*"
 spin_sleep = "*"

