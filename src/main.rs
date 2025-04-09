@@ -36,13 +36,6 @@ fn main() {
                 .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("threads")
-                .short('i')
-                .help("Spin up extra threads generating datagrams")
-                .value_name("THREADS")
-                .num_args(1),
-        )
-        .arg(
             Arg::new("dst-port")
                 .short('p')
                 .help("Destination port")
@@ -69,12 +62,6 @@ fn main() {
                 .help("Sleeps the thread for the specified time in μs before sending a new packet (Default: 0μs)")
                 .value_name("MICROSECONDS")
                 .num_args(1),
-        )
-        .arg(
-            Arg::new("land-attack")
-                .short('l')
-                .help("Land Attack")
-                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("precompute-random-IPs")
