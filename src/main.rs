@@ -1,7 +1,3 @@
-extern crate pnet;
-extern crate rand;
-extern crate spin_sleep;
-
 use clap::{Arg, ArgAction, Command};
 use pnet::packet;
 use pnet::packet::Packet;
@@ -118,7 +114,6 @@ fn main() {
         }
     };
 
-    // Fix: check if the delay option is present using contains_id instead of get_flag
     let delay_enabled = matches.contains_id("delay");
     let delay = match matches.get_one::<String>("delay") {
         Some(delay) => match delay.parse::<u64>() {
@@ -146,10 +141,8 @@ fn main() {
         Err(e) => panic!("{}", e),
     };
 
-    // Fix: Use thread_rng instead of rng
     let mut rng = rand::rng();
 
-    // Before the main loop
     let ip_addresses = match matches.get_one::<String>("precompute-random-IPs") {
         None => 1_000_000,
         Some(ip_addresses) => match ip_addresses.parse::<usize>() {
@@ -164,10 +157,8 @@ fn main() {
     let mut random_bytes = vec![0u8; ip_addresses * 4]; // 4 bytes per IPv4 address
     rng.fill_bytes(&mut random_bytes);
 
-    // Generate a random u16 for source port
     let random_src_port = rng.random::<u16>();
 
-    // Fix: check for dst-port using contains_id instead of get_flag
     if !matches.contains_id("dst-port") {
         // Generate a random u16 for destination port
         let random_dst_port = rng.random::<u16>();
@@ -227,7 +218,7 @@ fn main() {
         );
         return;
     }
-    
+
     loop {
         send_packets(
             &mut tx,
@@ -248,10 +239,10 @@ fn main() {
 }
 
 fn send_packets(
-    tx: &mut pnet::transport::TransportSender,
+    tx: &mut transport::TransportSender,
     dst_ip: Ipv4Addr,
     random_src: bool,
-    ipv4_packet: &mut pnet::packet::ipv4::MutableIpv4Packet,
+    ipv4_packet: &mut packet::ipv4::MutableIpv4Packet,
     batch_index: usize,
     random_bytes: &mut Vec<u8>,
 ) {

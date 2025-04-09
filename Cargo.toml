@@ -1,11 +1,11 @@
 [package]
 name = "fudp"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["xorrsprsp"]
-edition = "2024"  # Added this line for the newest edition
+edition = "2024"
 
 [dependencies]
-clap = "4.4"  # Updated to a specific version for clap v4
+clap = "*"
 pnet = "*"
 rand = "*"
 spin_sleep = "*"
